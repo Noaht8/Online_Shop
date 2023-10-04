@@ -1,13 +1,37 @@
 const User = require('../models/user.model');
 const authUtil = require('../util/authentication');
 const validation = require('../util/validation');
-
+const sessionFlash = require('../util/session-flash');
 
 function getSignUp(req, res) {
-    res.render('customer/auth/signup');
+    let sessionData = sessionFlash.getSessionData(req);
+
+    if (!sessionData) {
+        sessionData = {
+            email: '',
+            password: '',
+            confirmPassword: '',
+            fullname: '',
+            street: '',
+            postal: '',
+            city: ''
+        };
+    }
+
+    
+    res.render('customer/auth/signup', { inputData: sessionData });
 }
 
 async function signup(req, res, next) {
+    const enteredData = {
+            email: req.body.email, 
+            password: req.body.password, 
+            confirmPassword: req.body['confirm-password'],
+            fullname: req.body.fullname, 
+            street: req.body.street, 
+            postal: req.body.postal, 
+            city: req.body.city 
+    };
     
     if (!validation.userDetailsAreValid(
             req.body.email, 
@@ -16,9 +40,15 @@ async function signup(req, res, next) {
             req.body.street, 
             req.body.postal, 
             req.body.city 
-            ) || !validation.passwordIsConfirmed(req.body.password, req.body.['confirm-password'])
+            ) || !validation.passwordIsConfirmed(req.body.password, req.body['confirm-password'])
         ) {
-            res.redirect('/signup');
+            sessionFlash.flashDataToSession(req, {
+                errorMessage: 'Input Error. Check your input Again',
+                ...enteredData
+            }, 
+            function() {
+                res.redirect('/signup');
+            })
             return;
     }
 
@@ -37,10 +67,16 @@ async function signup(req, res, next) {
         const existsAlready =  await user.existsAlready();
 
         if (existsAlready) {
-            res.redirect('/signup');
+            sessionFlash.flashDataToSession(req, {
+                errorMessage: 'User already Exists. Try logging in instead!',
+                ...enteredData
+            }, 
+            function() {
+                res.redirect('/signup');
+            });
             return;
         }
-        
+
         await user.signup();
     } catch (error) {
         next(error);
@@ -52,7 +88,16 @@ async function signup(req, res, next) {
 }
 
 function getLogin(req, res, next ) {
-    res.render('customer/auth/login');
+    let sessionData = sessionFlash.getSessionData(req);
+
+    if (!sessionData) {
+        sessionData = {
+            email: '',
+            password: ''
+        };
+    }
+
+    res.render('customer/auth/login', { inputData: sessionData });
 }
 
 async function login(req, res, next) {
@@ -65,15 +110,26 @@ async function login(req, res, next) {
         return;
     }
 
+    const sessionErrorData = {
+            errorMessage: 'Incorrect Email or Password!',
+            email: user.email,
+            password: user.password 
+    };
+
     if (!existingUser) {
-        res.redirect('/login');
+        sessionFlash.flashDataToSession(req, sessionErrorData , function() {
+            res.redirect('/login');
+        })
+
         return;
     }
 
     const passwordIsCorrect = await user.hasMatchingPassword(existingUser.password);
     
     if (!passwordIsCorrect) {
-        res.redirect('/login');
+        sessionFlash.flashDataToSession(req, sessionErrorData , function() {
+            res.redirect('/login');
+        })
         return;
     }
 

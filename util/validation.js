@@ -22,7 +22,7 @@ function userDetailsAreValid(email, password, name, street, postal, city) {
 }
 
 function passwordIsConfirmed(password, confirmPassword) {
-    return email === confirmPassword;
+    return password === confirmPassword;
 }
 module.exports = {
     userDetailsAreValid: userDetailsAreValid,
